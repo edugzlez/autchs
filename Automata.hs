@@ -1,4 +1,4 @@
-module Automata(Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd) where
+module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd) where
 
 ------------------------------------------
 -- Tipo de dato para manejar estados  
@@ -248,4 +248,7 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = (AFN vocab' nodes
             where
                 qcierre =  closureEps afne q
                 qs = foldr (++) [] [q | q <- map (delta c) qcierre]
+        
         terminals' = [q | q <- nodes', hasIntersect (closureEps afne q) terminals]
+
+automataToFile :: Automata -> [Char] -> IO ()
