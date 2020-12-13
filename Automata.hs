@@ -12,12 +12,33 @@ data Status = Void | Q Int | QT [Status]
 instance Eq Status where
     (==) Void Void = True
     (==) (Q m) (Q n) = m == n 
-    (==) (QT xs) (QT ys) = xs == ys
+    (==) (QT xs) (QT ys) = quicksort(removeDuplicates xs) == quicksort(removeDuplicates ys)
     (==) _ _ = False
     
 ------------------------------------------
 -- Repertorio de funciones auxiliares  
 ------------------------------------------
+
+{-
+    sort :: ls1 -> ls2 -> ls
+
+    Ordena la lista
+-}
+
+quicksort :: (Ord a) => [a] -> [a]
+quicksort [] = []
+quicksort (x:xs) =
+  let smallerSorted = quicksort [a | a <- xs, a <= x]
+      biggerSorted = quicksort [a | a <- xs, a > x]
+  in  smallerSorted ++ [x] ++ biggerSorted
+
+{-
+    removeDuplicates lst
+
+    Elimina duplicados de la lista
+-}
+
+removeDuplicates = foldl (\seen x -> if x `elem` seen then seen else seen ++ [x]) []
 
 {-
     hasIntersect :: ls1 -> ls2 -> Bool
