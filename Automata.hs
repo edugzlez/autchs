@@ -164,17 +164,17 @@ normalizeNodes (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' ini
 reduce :: AFD -> AFD
 reduce (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial delta' terminals')
  where
-        nodes' = initial : [(Q n) | (Q n) <- nodes, esalcanzable (AFD vocab nodes initial delta terminals) (Q n)]
+        nodes' = [(Q n) | (Q n) <- nodes, esalcanzable (AFD vocab nodes initial delta terminals) (Q n)]
         delta' :: Char -> Status -> Status
-        delta' c (Q n)
-          |elem (Q n) nodes' = delta c (Q n)
+        delta' c a
+          |elem a nodes' = delta c a
           |otherwise = Void
-        terminals' = [(Q n) | (Q n) <- nodes', (Q n) <- terminals]
+        terminals' = [a | a <- nodes', a <- terminals]
 
 esalcanzable :: AFD -> Status -> Bool
 esalcanzable (AFD vocab nodes initial delta terminals) initial = True
 esalcanzable (AFD vocab nodes initial delta terminals) a = or(map (esalcanzable (AFD vocab nodes initial delta terminals)) [b])
-   where [b] = [(Q n) | delta (Q n) i = a, i<-vocab]
+   where [b] = [d | delta d i = a, i<-vocab]
 
 
 
