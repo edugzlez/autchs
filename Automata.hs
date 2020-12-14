@@ -1,4 +1,4 @@
-module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd) where
+module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd, reduce, procesa) where
 
 ------------------------------------------
 -- Tipo de dato para manejar estados  
@@ -28,9 +28,9 @@ instance Eq Status where
 quicksort :: (Ord a) => [a] -> [a]
 quicksort [] = []
 quicksort (x:xs) =
-  let smallerSorted = quicksort [a | a <- xs, a <= x]
-      biggerSorted = quicksort [a | a <- xs, a > x]
-  in  smallerSorted ++ [x] ++ biggerSorted
+  let ls = quicksort [a | a <- xs, a <= x]
+      rs = quicksort [a | a <- xs, a > x]
+  in ls ++ [x] ++ rs
 
 {-
     removeDuplicates lst
@@ -38,6 +38,7 @@ quicksort (x:xs) =
     Elimina duplicados de la lista
 -}
 
+removeDuplicates :: (Eq a) => [a] -> [a]
 removeDuplicates = foldl (\seen x -> if x `elem` seen then seen else seen ++ [x]) []
 
 {-
@@ -68,6 +69,7 @@ indexOf :: Eq a => a -> [a] -> Int
 indexOf e xs = indexOf' e xs 0
 
 indexOf' :: Eq a => a -> [a] -> Int -> Int
+indexOf' e [] n = -1
 indexOf' e (x:xs) n
     | x == e = n
     | otherwise = indexOf' e xs (n+1)
@@ -138,6 +140,7 @@ instance Automata AFD where
 
     Dado un autómata lo convierte a uno con los estados al tipo Q n.
 -}
+
 normalizeNodes :: AFD -> AFD
 normalizeNodes (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial' delta' terminals')
     where
@@ -151,16 +154,12 @@ normalizeNodes (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' ini
         delta' _ _ = Void
 
         terminals' = filter (\(Q n) -> elem (nodes !! n) terminals) nodes'
-{-
-    Autómata finito no determinista
-
-    vocab nodes initial delta terminals
--}
 
 {-
    reduce :: automata -> atomata_reducido
    Dado un autómata elimina sus nodos inalcanzables
 -}
+
 reduce :: AFD -> AFD
 reduce (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial delta' terminals')
  where
@@ -169,15 +168,19 @@ reduce (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial del
         delta' c a
           |elem a nodes' = delta c a
           |otherwise = Void
-        terminals' = [a | a <- nodes', a <- terminals]
+        terminals' = [a | a <- nodes', elem a terminals]
 
 esalcanzable :: AFD -> Status -> Bool
 esalcanzable (AFD vocab nodes initial delta terminals) a
     | a== initial = True
-    |otherwise = or(map (esalcanzable (AFD vocab nodes initial delta terminals)) [b])
-        where [b] = [d | delta d i = a, i<-vocab, d /= a]
+    | otherwise = or(map (esalcanzable (AFD vocab nodes initial delta terminals)) b)
+        where b = [d | d<-nodes, i<-vocab, d /= a, delta i d == a]
 
+{-
+    Autómata finito no determinista
 
+    vocab nodes initial delta terminals
+-}
 
 
 data AFN = AFN [Char] [Status] Status (Char -> Status -> [Status]) [Status]
@@ -295,11 +298,8 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = (AFN vocab' nodes
         
         terminals' = [q | q <- nodes', hasIntersect (closureEps afne q) terminals]
 
-automataToFile :: Automata -> [Char] -> IO ()
-automataToFile (AFD vocab nodes initial delta terminals) c = do writeFile c nuevo
-            where nuevo = procesa (AFD vocab nodes initial delta terminals)
+automataToFile :: AFD -> [Char] -> IO ()
+automataToFile at c = do writeFile c (procesa at)
 
-procesa :: Automata -> [Char]
-procesa (AFD vocab nodes initial delta terminals) = unlines(vocab, (map show(nodes)), show(initial), delta, show(terminals))
-
-
+procesa :: AFD -> [Char]
+procesa (AFD vocab nodes initial delta terminals) = unlines [vocab, show nodes, show initial, show terminals]
