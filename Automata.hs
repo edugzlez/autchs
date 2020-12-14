@@ -296,3 +296,10 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = (AFN vocab' nodes
         terminals' = [q | q <- nodes', hasIntersect (closureEps afne q) terminals]
 
 automataToFile :: Automata -> [Char] -> IO ()
+automataToFile (AFD vocab nodes initial delta terminals) c = do writeFile c nuevo
+            where nuevo = procesa (AFD vocab nodes initial delta terminals)
+
+procesa :: Automata -> [Char]
+procesa (AFD vocab nodes initial delta terminals) = unlines(vocab, (map show(nodes)), show(initial), delta, show(terminals))
+
+
