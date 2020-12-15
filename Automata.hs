@@ -302,4 +302,4 @@ automataToFile :: AFD -> [Char] -> IO ()
 automataToFile at c = do writeFile c (procesa at)
 
 procesa :: AFD -> [Char]
-procesa (AFD vocab nodes initial delta terminals) = unlines [vocab, show nodes, show initial, show terminals]
+procesa (AFD vocab nodes initial delta terminals) = unlines [vocab, show nodes, show initial, show [(q,a,delta a q)| q <-nodes,a <- vocab],show terminals]
