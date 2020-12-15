@@ -174,7 +174,7 @@ reduce (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial del
 alcanzables :: AFD -> [Status] -> [Status] -> [Status] --revisados, por revisar, devuelve los revisados
 alcanzables at xs (q:ys)
    |elem q xs = alcanzables at xs ys
-   |otherwise = alcanzables at (y:xs) (ys++[delta a q|a<-vocab])
+   |otherwise = alcanzables at (y:xs) (ys++[delta a q |a<-vocab])
 alcanzables at xs [] = xs
 {-
     Autómata finito no determinista
