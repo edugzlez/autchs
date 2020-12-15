@@ -163,19 +163,20 @@ normalizeNodes (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' ini
 reduce :: AFD -> AFD
 reduce (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial delta' terminals')
  where
-        nodes' = [a | a <- nodes, esalcanzable (AFD vocab nodes initial delta terminals) a]
+        nodes' = (alcanzables (AFD vocab nodes initial delta terminals) [] [initial])
         delta' :: Char -> Status -> Status
         delta' c a
           |elem a nodes' = delta c a
           |otherwise = Void
         terminals' = [a | a <- nodes', elem a terminals]
 
-esalcanzable :: AFD -> Status -> Bool
-esalcanzable (AFD vocab nodes initial delta terminals) a
-    | a== initial = True
-    | otherwise = or(map (esalcanzable (AFD vocab nodes initial delta terminals)) b)
-        where b = [d | d<-nodes, i<-vocab, d /= a, delta i d == a]
 
+alcanzables :: AFD -> [Status] -> [Status] -> [Status] --revisados, por revisar, devuelve los revisados
+alcanzables at [] [Q 0] = alcanzables at [Q 0] [q | delta a (Q 0)==q, a<-vocab]
+alcanzables at xs (q:ys)
+   |elem q xs = alcanzables at xs ys
+   |otherwise = alcanzables at (y:xs) (ys++[q|delta a y==q, a<-vocab])
+alcanzables at xs [] = xs
 {-
     Autómata finito no determinista
 
