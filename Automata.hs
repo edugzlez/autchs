@@ -1,4 +1,4 @@
-module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd, reduce, procesa) where
+module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd, reduce, toFile) where
 
 ------------------------------------------
 -- Tipo de dato para manejar estados  
@@ -109,6 +109,7 @@ class Automata a where
 
     deltaB :: a -> [Char] -> [Status] -> [Status]
 
+
 {-
     Autómata finito determinista
     
@@ -133,7 +134,11 @@ instance Automata AFD where
     isRenewed afd word = elem final_q terminals
         where
             (AFD vocab nodes initial delta terminals) = afd
-            [final_q] = deltaA afd word initial
+            [final_q] = deltaB afd word [initial]
+
+
+instance Show AFD where
+    show (AFD vocab nodes initial delta terminals) = unlines [vocab, show nodes, show initial, show [(q,a,delta a q)| q <-nodes,a <- vocab],show terminals]
 
 {-
     normalizeNodes :: automata -> automata_normalizado
@@ -156,27 +161,38 @@ normalizeNodes (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' ini
         terminals' = filter (\(Q n) -> elem (nodes !! n) terminals) nodes'
 
 {-
-   reduce :: automata -> atomata_reducido
+   reduce :: automata -> automata_reducido
+
    Dado un autómata elimina sus nodos inalcanzables
 -}
 
 reduce :: AFD -> AFD
 reduce (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial delta' terminals')
  where
-        nodes' = (alcanzables (AFD vocab nodes initial delta terminals) [] [initial])
+        nodes' = (alcanzables (AFD vocab nodes initial delta terminals))
         delta' :: Char -> Status -> Status
         delta' c a
-          |elem a nodes' = delta c a
-          |otherwise = Void
+          | elem a nodes' = delta c a
+          | otherwise = Void
         terminals' = [a | a <- nodes', elem a terminals]
 
+{-
+   alcanzables :: automata -> lista_alcanzables
 
-alcanzables :: AFD -> [Status] -> [Status] -> [Status] --revisados, por revisar, devuelve los revisados
-alcanzables at [] [Q 0] = alcanzables at [Q 0] [q | delta a (Q 0)==q, a<-vocab]
-alcanzables at xs (q:ys)
-   |elem q xs = alcanzables at xs ys
-   |otherwise = alcanzables at (y:xs) (ys++[q|delta a y==q, a<-vocab])
-alcanzables at xs [] = xs
+   Dado un autómata devuelve una lista con los estados alcanzables desde el inicial. alcanzables' es una función auxiliar.
+-}
+
+alcanzables :: AFD -> [Status]
+alcanzables (AFD vocab nodes initial delta terminals) = alcanzables' (AFD vocab nodes initial delta terminals) [] [initial]
+
+alcanzables' :: AFD -> [Status] -> [Status] -> [Status]
+alcanzables' at xs [] = xs
+alcanzables' at xs (q:ys)
+   | elem q xs = alcanzables' at xs ys
+   | otherwise = alcanzables' at (q:xs) (ys++[delta a q | a <- vocab])
+   where
+       (AFD vocab nodes initial delta terminals) = at
+
 {-
     Autómata finito no determinista
 
@@ -202,6 +218,9 @@ instance Automata AFN where
             (AFN vocab nodes initial delta terminals) = afn
             final_qs = deltaA afn word initial
 
+instance Show AFN where
+    show (AFN vocab nodes initial delta terminals) = unlines [vocab, show nodes, show initial, show [(q,a,delta a q)| q <-nodes,a <- vocab],show terminals]
+
 {-
     afnToafd :: AFN -> AFD
 
@@ -213,7 +232,7 @@ afnToafd (AFN vocab nodes initial delta terminals) = (AFD vocab' nodes' initial'
     where
         afn = (AFN vocab nodes initial delta terminals)
         vocab' = vocab
-        nodes' = map QT (init$ powerset nodes)
+        nodes' = map QT (powerset nodes)
 
         initial' = QT [initial]
 
@@ -248,6 +267,9 @@ instance Automata AFNe where
         where
             (AFNe vocab nodes initial delta terminals epsilon) = afn
             final_qs = deltaA afn word initial
+
+instance Show AFNe where
+    show (AFNe vocab nodes initial delta terminals epsilon) = unlines [vocab, show nodes, show initial, show [(q,a,delta a q)| q <-nodes,a <- vocab], show terminals, show [(q,epsilon q)| q <-nodes]]
 
 {-
     reachableEps :: automata -> status
@@ -299,8 +321,11 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = (AFN vocab' nodes
         
         terminals' = [q | q <- nodes', hasIntersect (closureEps afne q) terminals]
 
-automataToFile :: AFD -> [Char] -> IO ()
-automataToFile at c = do writeFile c (procesa at)
+{-    
+    toFile :: object -> filename ->
 
-procesa :: AFD -> [Char]
-procesa (AFD vocab nodes initial delta terminals) = unlines [vocab, show nodes, show initial, show [(q,a,delta a q)| q <-nodes,a <- vocab],show terminals]
+    Imprime el objeto object, instancia de Show, en el archivo filename
+-}
+
+toFile :: Automata a => Show a => a -> [Char] -> IO ()
+toFile at c = do writeFile c (show at)
