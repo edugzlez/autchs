@@ -15,7 +15,7 @@ epsilon _ = []
 
 a = AFNe "ab" [Q 100, Q 0, Q 1, Q 2, Q 3] (Q 100) deltax [Q 1, Q 3] epsilon
 b = afnToafd (afneToafn a)
-c = normalizeNodes (b)
+c = normalizeNodes b
 d = reduce c
 (AFD vocab nodes initial delta terminals) = b
 (AFD vocab' nodes' initial' delta' terminals') = c

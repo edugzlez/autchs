@@ -1,4 +1,4 @@
-module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd, reduce, toFile) where
+module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd, reduce, toFile, fromFile) where
 
 ------------------------------------------
 -- Tipo de dato para manejar estados  
@@ -48,7 +48,7 @@ removeDuplicates = foldl (\seen x -> if x `elem` seen then seen else seen ++ [x]
 -}
 
 hasIntersect :: Eq a => [a] -> [a] -> Bool
-hasIntersect xs ys = any (flip elem ys) xs
+hasIntersect xs ys = any (`elem` ys) xs
 
 {-
     powerSet :: ls -> powLs
@@ -69,7 +69,7 @@ indexOf :: Eq a => a -> [a] -> Int
 indexOf e xs = indexOf' e xs 0
 
 indexOf' :: Eq a => a -> [a] -> Int -> Int
-indexOf' e [] n = -1
+indexOf' _ [] _ = -1
 indexOf' e (x:xs) n
     | x == e = n
     | otherwise = indexOf' e xs (n+1)
@@ -123,7 +123,9 @@ instance Automata AFD where
     deltaA _ [] q0 = [q0]
     deltaA afd (x:word) q0 = deltaA afd word (delta x q0)
         where
-            (AFD vocab nodes initial delta terminals) = afd
+            (AFD _ _ _ delta _) = afd
+    
+    
     
     deltaB _ [] qs = qs
     deltaB _ _ [] = []
@@ -131,15 +133,32 @@ instance Automata AFD where
         where
             nqs = [q | q <- map (delta x) qs, q /= Void]
 
-    isRenewed afd word = elem final_q terminals
+    
+    
+    isRenewed afd word = final_q `elem` terminals
         where
-            (AFD vocab nodes initial delta terminals) = afd
+            (AFD _ _ initial _ terminals) = afd
             [final_q] = deltaB afd word [initial]
-
 
 instance Show AFD where
     show (AFD vocab nodes initial delta terminals) = unlines [vocab, show nodes, show initial, show [(q,a,delta a q)| q <-nodes,a <- vocab],show terminals]
 
+instance Read AFD where
+    readsPrec _ txt = [(AFD vocab nodes initial delta terminals, "")]
+        where 
+            lin = lines txt
+            vocab = head lin
+            nodes = read (lin !! 1)::[Status]
+            initial = read (lin !! 2)::Status
+            deltas = read (lin !! 3)::[(Status, Char, Status)]
+            delta :: Char -> Status -> Status
+            delta a q
+                | length lst == 1 = let (_, _, z) = head lst in z
+                | otherwise = Void
+                where
+                    lst = filter (\(x,y,_) -> x == q && a == y) deltas
+            terminals = read (lin !! 4)::[Status]
+    
 {-
     normalizeNodes :: automata -> automata_normalizado
 
@@ -147,18 +166,18 @@ instance Show AFD where
 -}
 
 normalizeNodes :: AFD -> AFD
-normalizeNodes (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial' delta' terminals')
+normalizeNodes (AFD vocab nodes initial delta terminals) = AFD vocab nodes' initial' delta' terminals'
     where
-        nodes' = map Q [0..((length nodes)-1)]
+        nodes' = map Q [0..(length nodes-1)]
         initial' = Q (indexOf initial nodes)
         delta' :: Char -> Status -> Status
         delta' c (Q n)
-            | (n < length nodes) && (n>= 0) && (elem c vocab) = Q (indexOf (delta c (nodes !! n)) nodes)
+            | (n < length nodes) && (n>= 0) && (c `elem` vocab) = Q (indexOf (delta c (nodes !! n)) nodes)
             | otherwise = Void
 
         delta' _ _ = Void
 
-        terminals' = filter (\(Q n) -> elem (nodes !! n) terminals) nodes'
+        terminals' = filter (\(Q n) -> (nodes !! n) `elem` terminals) nodes'
 
 {-
    reduce :: automata -> automata_reducido
@@ -167,14 +186,14 @@ normalizeNodes (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' ini
 -}
 
 reduce :: AFD -> AFD
-reduce (AFD vocab nodes initial delta terminals) = (AFD vocab nodes' initial delta' terminals')
+reduce (AFD vocab nodes initial delta terminals) = AFD vocab nodes' initial delta' terminals'
  where
-        nodes' = (alcanzables (AFD vocab nodes initial delta terminals))
+        nodes' = alcanzables (AFD vocab nodes initial delta terminals)
         delta' :: Char -> Status -> Status
         delta' c a
-          | elem a nodes' = delta c a
+          | a `elem` nodes' = delta c a
           | otherwise = Void
-        terminals' = [a | a <- nodes', elem a terminals]
+        terminals' = [a | a <- nodes', a `elem` terminals]
 
 {-
    alcanzables :: automata -> lista_alcanzables
@@ -186,12 +205,12 @@ alcanzables :: AFD -> [Status]
 alcanzables (AFD vocab nodes initial delta terminals) = alcanzables' (AFD vocab nodes initial delta terminals) [] [initial]
 
 alcanzables' :: AFD -> [Status] -> [Status] -> [Status]
-alcanzables' at xs [] = xs
+alcanzables' _ xs [] = xs
 alcanzables' at xs (q:ys)
-   | elem q xs = alcanzables' at xs ys
+   | q `elem` xs = alcanzables' at xs ys
    | otherwise = alcanzables' at (q:xs) (ys++[delta a q | a <- vocab])
    where
-       (AFD vocab nodes initial delta terminals) = at
+       (AFD vocab _ _ delta _) = at
 
 {-
     Autómata finito no determinista
@@ -211,11 +230,11 @@ instance Automata AFN where
     deltaB _ _ [] = []
     deltaB (AFN vocab nodes initial delta terminals) (x:word) qs = deltaB (AFN vocab nodes initial delta terminals) word nqs 
         where
-            nqs = foldr (++) [] [q | q <- map (delta x) qs]
+            nqs = concatMap (delta x) qs
 
     isRenewed afn word = hasIntersect final_qs terminals
         where
-            (AFN vocab nodes initial delta terminals) = afn
+            (AFN _ _ initial _ terminals) = afn
             final_qs = deltaA afn word initial
 
 instance Show AFN where
@@ -228,9 +247,9 @@ instance Show AFN where
 -}
 
 afnToafd :: AFN -> AFD
-afnToafd (AFN vocab nodes initial delta terminals) = (AFD vocab' nodes' initial' delta' terminals')
+afnToafd (AFN vocab nodes initial delta terminals) = AFD vocab' nodes' initial' delta' terminals'
     where
-        afn = (AFN vocab nodes initial delta terminals)
+        afn = AFN vocab nodes initial delta terminals
         vocab' = vocab
         nodes' = map QT (powerset nodes)
 
@@ -259,13 +278,13 @@ instance Automata AFNe where
     deltaB _ _ [] = []
     deltaB (AFNe vocab nodes initial delta terminals epsilon) (x:word) qs = deltaB (AFNe vocab nodes initial delta terminals epsilon) word nqs_cierre 
         where
-            qs_cierre =  foldr (++) [] (map (closureEps (AFNe vocab nodes initial delta terminals epsilon)) qs) 
-            nqs = foldr (++) [] [q | q <- map (delta x) qs_cierre]
-            nqs_cierre = foldr (++) [] (map (closureEps (AFNe vocab nodes initial delta terminals epsilon)) nqs) 
+            qs_cierre =  concatMap (closureEps (AFNe vocab nodes initial delta terminals epsilon)) qs
+            nqs = concatMap (delta x) qs_cierre
+            nqs_cierre = concatMap (closureEps (AFNe vocab nodes initial delta terminals epsilon)) nqs
 
     isRenewed afn word = hasIntersect final_qs terminals
         where
-            (AFNe vocab nodes initial delta terminals epsilon) = afn
+            (AFNe _ _ initial _ terminals _) = afn
             final_qs = deltaA afn word initial
 
 instance Show AFNe where
@@ -305,9 +324,9 @@ closureEps at q = q : reachableEps at q
 -}
 
 afneToafn :: AFNe -> AFN
-afneToafn (AFNe vocab nodes initial delta terminals epsilon) = (AFN vocab' nodes' initial' delta' terminals')
+afneToafn (AFNe vocab nodes initial delta terminals epsilon) = AFN vocab' nodes' initial' delta' terminals'
     where
-        afne = (AFNe vocab nodes initial delta terminals epsilon)
+        afne = AFNe vocab nodes initial delta terminals epsilon
         vocab' = vocab
         nodes' = nodes
 
@@ -317,7 +336,7 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = (AFN vocab' nodes
         delta' c q = qs
             where
                 qcierre =  closureEps afne q
-                qs = foldr (++) [] [q | q <- map (delta c) qcierre]
+                qs = concatMap (delta c) qcierre
         
         terminals' = [q | q <- nodes', hasIntersect (closureEps afne q) terminals]
 
@@ -329,3 +348,12 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = (AFN vocab' nodes
 
 toFile :: Automata a => Show a => a -> [Char] -> IO ()
 toFile at c = do writeFile c (show at)
+
+{-    
+    EN CUARENTENA
+-}
+
+fromFile :: [Char] -> IO AFD
+fromFile filepath = do
+    file <- readFile filepath
+    let at = read file::AFD in return at
