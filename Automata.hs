@@ -1,4 +1,21 @@
-module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed, normalizeNodes, afneToafn, afnToafd, reduce, toFile, fromFile) where
+module Automata(
+    Automata,
+    Status (..),
+    AFD (..),
+    AFN (..),
+    AFNe (..),
+    isRenewed,
+    normalizeNodes,
+    afneToafn,
+    afnToafd,
+    reduce,
+    toFile,
+    orAFD,
+    andAFD,
+    deltaB,
+    complementaryAFD,
+    minusAFD
+) where
 
 ------------------------------------------
 -- Tipo de dato para manejar estados  
@@ -6,13 +23,14 @@ module Automata(Automata, Status (..), AFD (..), AFN (..), AFNe (..), isRenewed,
 -- Q 0, Q 1..., así como estados producto
 ------------------------------------------
 
-data Status = Void | Q Int | QT [Status]
+data Status = Trash | Q Int | QT [Status] | QP Status Status
     deriving (Show, Ord, Read)
 
 instance Eq Status where
-    (==) Void Void = True
+    (==) Trash Trash = True
     (==) (Q m) (Q n) = m == n 
     (==) (QT xs) (QT ys) = quicksort(removeDuplicates xs) == quicksort(removeDuplicates ys)
+    (==) (QP a b) (QP c d) = a == c && b == d
     (==) _ _ = False
     
 ------------------------------------------
@@ -131,9 +149,7 @@ instance Automata AFD where
     deltaB _ _ [] = []
     deltaB (AFD vocab nodes initial delta terminals) (x:word) qs = deltaB (AFD vocab nodes initial delta terminals) word nqs 
         where
-            nqs = [q | q <- map (delta x) qs, q /= Void]
-
-    
+            nqs = map (delta x) qs
     
     isRenewed afd word = final_q `elem` terminals
         where
@@ -154,11 +170,54 @@ instance Read AFD where
             delta :: Char -> Status -> Status
             delta a q
                 | length lst == 1 = let (_, _, z) = head lst in z
-                | otherwise = Void
+                | otherwise = Trash
                 where
                     lst = filter (\(x,y,_) -> x == q && a == y) deltas
             terminals = read (lin !! 4)::[Status]
+
+
+{-    
+    orAFD
+-}
+
+orAFD :: AFD -> AFD -> AFD
+orAFD (AFD vocab' nodes' initial' delta' terminals') (AFD vocab'' nodes'' initial'' delta'' terminals'')   = AFD vocab nodes initial delta terminals where
+    vocab = removeDuplicates (vocab'++vocab'')
+    nodes = Trash:[QP a b | a<-nodes', b<-nodes'']
+    initial = QP initial' initial''
+
+    isOrQP :: Status -> Bool
+    isOrQP (QP a b) = a `elem` terminals' ||  b `elem` terminals''
+    isOrQP _ = False
+
+    terminals = filter isOrQP nodes
     
+    delta :: Char -> Status -> Status
+    delta char (QP a b) = QP (delta' char a) (delta'' char b)
+    delta _ _ = Trash
+
+{-    
+    andAFD
+-}
+
+andAFD :: AFD -> AFD -> AFD
+andAFD (AFD vocab' nodes' initial' delta' terminals') (AFD vocab'' nodes'' initial'' delta'' terminals'')   = AFD vocab nodes initial delta terminals where
+    (AFD vocab nodes initial delta _) = orAFD (AFD vocab' nodes' initial' delta' terminals') (AFD vocab'' nodes'' initial'' delta'' terminals'')
+    
+    isAndQP :: Status -> Bool
+    isAndQP (QP a b) = a `elem` terminals' &&  b `elem` terminals''
+    isAndQP _ = False
+
+    terminals = filter isAndQP nodes
+
+
+complementaryAFD :: AFD -> AFD
+complementaryAFD (AFD vocab nodes initial delta terminals')  = AFD vocab nodes initial delta terminals where
+    terminals = filter (`notElem` terminals') nodes
+
+minusAFD :: AFD -> AFD -> AFD
+minusAFD at1 at2 = andAFD at1 (complementaryAFD at2)
+
 {-
     normalizeNodes :: automata -> automata_normalizado
 
@@ -173,9 +232,9 @@ normalizeNodes (AFD vocab nodes initial delta terminals) = AFD vocab nodes' init
         delta' :: Char -> Status -> Status
         delta' c (Q n)
             | (n < length nodes) && (n>= 0) && (c `elem` vocab) = Q (indexOf (delta c (nodes !! n)) nodes)
-            | otherwise = Void
+            | otherwise = Trash
 
-        delta' _ _ = Void
+        delta' _ _ = Trash
 
         terminals' = filter (\(Q n) -> (nodes !! n) `elem` terminals) nodes'
 
@@ -188,11 +247,11 @@ normalizeNodes (AFD vocab nodes initial delta terminals) = AFD vocab nodes' init
 reduce :: AFD -> AFD
 reduce (AFD vocab nodes initial delta terminals) = AFD vocab nodes' initial delta' terminals'
  where
-        nodes' = alcanzables (AFD vocab nodes initial delta terminals)
+        nodes' = Trash:alcanzables (AFD vocab nodes initial delta terminals)
         delta' :: Char -> Status -> Status
         delta' c a
           | a `elem` nodes' = delta c a
-          | otherwise = Void
+          | otherwise = Trash
         terminals' = [a | a <- nodes', a `elem` terminals]
 
 {-
@@ -251,13 +310,13 @@ afnToafd (AFN vocab nodes initial delta terminals) = AFD vocab' nodes' initial' 
     where
         afn = AFN vocab nodes initial delta terminals
         vocab' = vocab
-        nodes' = map QT (powerset nodes)
+        nodes' = Trash : map QT (powerset nodes)
 
         initial' = QT [initial]
 
         delta' :: Char -> Status -> Status
         delta' c (QT qs) = QT (deltaB afn [c] qs)
-        delta' _ _ = Void
+        delta' _ _ = Trash
 
         terminals' = [QT qs | (QT qs) <- nodes', hasIntersect qs terminals]
 
@@ -348,12 +407,3 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = AFN vocab' nodes'
 
 toFile :: Automata a => Show a => a -> [Char] -> IO ()
 toFile at c = do writeFile c (show at)
-
-{-    
-    EN CUARENTENA
--}
-
-fromFile :: [Char] -> IO AFD
-fromFile filepath = do
-    file <- readFile filepath
-    let at = read file::AFD in return at

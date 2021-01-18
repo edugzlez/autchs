@@ -20,3 +20,26 @@ d = reduce c
 (AFD vocab nodes initial delta terminals) = b
 (AFD vocab' nodes' initial' delta' terminals') = c
 (AFD vocab'' nodes'' initial'' delta'' terminals'') = d
+
+
+vocab1 = "ab"
+nodes1 = [Q 0, Q 1, Trash]
+initial1 = Q 0
+terminals1 = [Q 1]
+
+delta1 :: Char -> Status -> Status
+delta1 'a' (Q 0) = Q 1
+delta1 'a' (Q 1) = Q 1
+delta1 _ _ = Trash
+
+delta2 :: Char -> Status -> Status
+delta2 'b' (Q 0) = Q 1
+delta2 'b' (Q 1) = Q 1
+delta2 _ _ = Trash
+
+soloa = AFD vocab1 nodes1 initial1 delta1 terminals1
+solob = AFD vocab1 nodes1 initial1 delta2 terminals1
+
+orab = orAFD soloa solob
+
+andab = andAFD soloa solob
