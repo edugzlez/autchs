@@ -407,3 +407,19 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = AFN vocab' nodes'
 
 toFile :: Automata a => Show a => a -> [Char] -> IO ()
 toFile at c = do writeFile c (show at)
+
+-- readfile:: Toma un automata y un fichero, con una palabra en cada linea, y escribe en él si las palabras del fichero pertenecen al automata
+
+readfile :: Automata a => a-> IO ()
+readfile a = do putStr "Dime nombre fichero de entrada: "
+                nombre <- getLine
+                contenido <- readFile nombre
+                if and (read(procesa a contenido)::[Bool]) 
+                   then (putStr "Todas correctas")
+                   else putStr (procesa a contenido)
+
+procesa :: Automata a=> a -> String -> String
+procesa a xs = show(map (isRenewed a) (lines xs))
+  
+    
+         
