@@ -1,3 +1,10 @@
+{-
+    Práctica de Haskell
+
+    - González Vaquero, Eduardo
+    - Ramos Rosado, Lucía
+-}
+
 module Automata(
     Automata,
     Status (..),
@@ -14,7 +21,8 @@ module Automata(
     andAFD,
     deltaB,
     complementaryAFD,
-    minusAFD
+    minusAFD,
+    renewedFile
 ) where
 
 ------------------------------------------
@@ -408,18 +416,22 @@ afneToafn (AFNe vocab nodes initial delta terminals epsilon) = AFN vocab' nodes'
 toFile :: Automata a => Show a => a -> [Char] -> IO ()
 toFile at c = do writeFile c (show at)
 
--- readfile:: Toma un automata y un fichero, con una palabra en cada linea, y escribe en él si las palabras del fichero pertenecen al automata
+{-    
+    renewedFile :: Automata -> filename ->
 
-readfile :: Automata a => a-> IO ()
-readfile a = do putStr "Dime nombre fichero de entrada: "
-                nombre <- getLine
-                contenido <- readFile nombre
-                if and (read(procesa a contenido)::[Bool]) 
-                   then (putStr "Todas correctas")
-                   else putStr (procesa a contenido)
+    Toma un automata y un fichero, con una palabra en cada linea, dice si las palabras del fichero pertenecen al automata
+-}
 
-procesa :: Automata a=> a -> String -> String
-procesa a xs = show(map (isRenewed a) (lines xs))
-  
-    
-         
+renewedFile :: Automata a => a -> [Char] -> IO ()
+renewedFile at filename = do 
+                content <- readFile filename
+                let result = renewedFileprocess at content
+                if 
+                    and (read result::[Bool]) 
+                then 
+                    putStr "Todas correctas"
+                else
+                    putStr result
+
+renewedFileprocess :: Automata a=> a -> String -> String
+renewedFileprocess at xs = show (map (isRenewed at) (lines xs))
