@@ -1,3 +1,5 @@
-abbabb
-bbabb
-ababa
+abacba
+caaaabababababcb
+ccb
+cabcb
+acabcb
