@@ -6,12 +6,11 @@
 -}
 
 module Automata(
-    Automata,
+    Automata (..),
     Status (..),
     AFD (..),
     AFN (..),
     AFNe (..),
-    isRenewed,
     normalizeNodes,
     afneToafn,
     afnToafd,
@@ -19,10 +18,12 @@ module Automata(
     toFile,
     orAFD,
     andAFD,
-    deltaB,
     complementaryAFD,
     minusAFD,
-    renewedFile
+    renewedFile,
+    regToAFNe,
+    Regexable (..),
+    Regex (..),
 ) where
 
 ------------------------------------------
@@ -352,7 +353,7 @@ instance Automata AFNe where
     isRenewed afn word = hasIntersect final_qs terminals
         where
             (AFNe _ _ initial _ terminals _) = afn
-            final_qs = deltaA afn word initial
+            final_qs = concatMap (closureEps afn) (deltaA afn word initial)
 
 instance Show AFNe where
     show (AFNe vocab nodes initial delta terminals epsilon) = unlines [vocab, show nodes, show initial, show [(q,a,delta a q)| q <-nodes,a <- vocab], show terminals, show [(q,epsilon q)| q <-nodes]]
@@ -435,3 +436,128 @@ renewedFile at filename = do
 
 renewedFileprocess :: Automata a=> a -> String -> String
 renewedFileprocess at xs = show (map (isRenewed at) (lines xs))
+
+
+{-
+    EXPRESIONES REGULARES
+-}
+infixl 6 |+|
+infixl 5 |++|
+
+class Regexable a where
+    {-
+        Suma de ER
+    -}
+    (|+|) :: a -> a -> Regex
+
+    {-
+        Concatenación de ER
+    -}
+    (|++|) :: a -> a -> Regex
+
+    {-
+        Cierre de ER
+    -}
+    (|^|) :: a -> Regex
+
+data Regex = RexChar Char | RexSum Regex Regex | RexClosing Regex | RexConcat Regex Regex
+    deriving (Eq,Show) 
+
+instance Regexable Regex where
+    a |+| b = RexSum a b
+    a |++| b = RexConcat a b
+    (|^|) a  = RexClosing a
+
+instance Regexable Char where
+    a |+| b = RexSum (RexChar a) (RexChar b)
+    a |++| b = RexConcat (RexChar a) (RexChar b)
+    (|^|) a  = RexClosing (RexChar a)
+
+regToAFNe :: Regex -> AFNe
+regToAFNe (RexChar c) = AFNe vocab nodes initial delta terminals epsilon
+    where
+        vocab = [c]
+        nodes = [Q 0, Q 1]
+        initial = Q 0
+
+        delta :: Char -> Status -> [Status]
+        delta char (Q 0)
+            | char == c = [Q 1]
+            | otherwise = []
+        delta _ _ = []
+
+        epsilon :: Status -> [Status]
+        epsilon _ = []
+
+        terminals = [Q 1]
+
+regToAFNe (RexClosing reg) = AFNe vocab nodes initial delta terminals epsilon
+    where
+        AFNe vocab nodes' initial' delta' terminals' epsilon' = regToAFNe reg
+
+        nodes = Q 0 : Q 1 : [QP (Q 1) q | q <- nodes']
+        initial = Q 0
+        terminals = [Q 1]
+
+        delta :: Char -> Status -> [Status]
+        delta char (QP (Q 1) q) = map (QP (Q 1)) (delta' char q) 
+        delta _ _ = []
+
+        epsilon :: Status -> [Status]
+        epsilon (Q 0) = [QP (Q 1) initial', Q 1]
+        epsilon (QP (Q 1) q)
+            | q `elem` terminals' = Q 1 : QP (Q 1) initial' :  map (QP (Q 1)) (epsilon' q)
+            | otherwise = map (QP (Q 1)) (epsilon' q)
+        epsilon _ = []
+
+regToAFNe (RexSum reg1 reg2) = AFNe vocab nodes initial delta terminals epsilon
+    where
+        AFNe vocab' nodes' initial' delta' terminals' epsilon' = regToAFNe reg1
+        AFNe vocab'' nodes'' initial'' delta'' terminals'' epsilon'' = regToAFNe reg2
+
+        vocab = removeDuplicates (vocab' ++ vocab'')
+        nodes = Q 0 : Q 1 : [QP (Q 1) q | q <- nodes'] ++ [QP (Q 2) q | q <- nodes'']
+        initial = Q 0
+        terminals = [Q 1]
+        
+        delta :: Char -> Status -> [Status]
+        delta char (QP (Q 1) q) = map (QP (Q 1)) (delta' char q)
+        delta char (QP (Q 2) q) = map (QP (Q 2)) (delta'' char q)
+        delta _ _ = []
+
+        epsilon :: Status -> [Status]
+        epsilon (QP (Q 1) q)
+            | q `elem` terminals' = Q 1 : map (QP (Q 1)) (epsilon' q)
+            | otherwise = map (QP (Q 1)) (epsilon' q)
+            
+        epsilon (QP (Q 2) q)
+            | q `elem` terminals' = Q 1 : map (QP (Q 2)) (epsilon'' q)
+            | otherwise = map (QP (Q 2)) (epsilon'' q)
+    
+        epsilon (Q 0) = [QP (Q 1) initial', QP (Q 2) initial'']
+
+        epsilon _ = []
+
+regToAFNe (RexConcat reg1 reg2) = AFNe vocab nodes initial delta terminals epsilon
+    where
+        AFNe vocab' nodes' initial' delta' terminals' epsilon' = regToAFNe reg1
+        AFNe vocab'' nodes'' initial'' delta'' terminals'' epsilon'' = regToAFNe reg2
+
+        vocab = removeDuplicates (vocab' ++ vocab'')
+        nodes = [QP (Q 1) q | q <- nodes'] ++ [QP (Q 2) q | q <- nodes'']
+        initial = QP (Q 1) initial'
+        terminals = [QP (Q 2) q | q <- terminals'']
+        
+        delta :: Char -> Status -> [Status]
+        delta char (QP (Q 1) q) = map (QP (Q 1)) (delta' char q)
+        delta char (QP (Q 2) q) = map (QP (Q 2)) (delta'' char q)
+        delta _ _ = []
+
+        epsilon :: Status -> [Status]
+        epsilon (QP (Q 1) q)
+            | q `elem` terminals' = QP (Q 2) initial'' : map (QP (Q 1)) (epsilon' q)
+            | otherwise = map (QP (Q 1)) (epsilon' q)
+            
+        epsilon (QP (Q 2) q) =map (QP (Q 2)) (epsilon'' q)
+
+        epsilon _ = []
