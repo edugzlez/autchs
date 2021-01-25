@@ -531,7 +531,7 @@ regToAFNe (RexSum reg1 reg2) = AFNe vocab nodes initial delta terminals epsilon
             | otherwise = map (QP (Q 1)) (epsilon' q)
             
         epsilon (QP (Q 2) q)
-            | q `elem` terminals' = Q 1 : map (QP (Q 2)) (epsilon'' q)
+            | q `elem` terminals'' = Q 1 : map (QP (Q 2)) (epsilon'' q)
             | otherwise = map (QP (Q 2)) (epsilon'' q)
     
         epsilon (Q 0) = [QP (Q 1) initial', QP (Q 2) initial'']
